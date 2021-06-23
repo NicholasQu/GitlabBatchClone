@@ -1,10 +1,10 @@
 {
-  "name": "gitlab-backup-util",
+  "name": "gitlab-batch-clone",
   "version": "1.1.0",
   "description": "A small utility to backup or clone all projects you have on gitlab.",
   "main": "index.js",
   "bin": {
-    "gitlab-backup-util": "index.js"
+    "gitlab-batch-clone": "index.js"
   },
   "scripts": {
     "start": "node index.js",
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/itsTeknas/GitlabBackupUtil.git"
+    "url": "https://github.com/NicholasQu/GitlabBatchClone.git"
   },
   "author": "Sanket Berde",
   "license": "Apache-2.0",

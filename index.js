@@ -41,6 +41,11 @@ const cliProgress = require('cli-progress');
       type: 'string',
       description: 'Specify clone method (default is http)'
     })
+    .option('apiversion', {
+      alias: 'p',
+      type: 'string',
+      description: 'old gitlab type input [v3], else default [v4].'
+    })
     .help(true)
     .argv
 
@@ -48,7 +53,7 @@ const cliProgress = require('cli-progress');
   if(argv.verbose){
     console.log(`Set gitlab url to ${baseUrl}`)
   }
-  console.log()
+  console.log(`token is ${argv.token}`)
   if (!argv.token) {
     console.log(
       `Please pass your gitlab token using the --token flag,\nGet your token at ${baseUrl}/profile/personal_access_tokens\n\npass --help for full help\n\n`
@@ -57,6 +62,11 @@ const cliProgress = require('cli-progress');
   }
   
   const method = argv.method == 'ssh' ? 'ssh_url_to_repo' : 'http_url_to_repo'
+  console.log(`method is ${method}`)
+
+  const apiversion = argv.apiversion == '' ? 'v4' : argv.apiversion
+  console.log(`api version is ${apiversion}`)
+
   const requestOptions = {
     json: true,
     qs: {
@@ -67,48 +77,71 @@ const cliProgress = require('cli-progress');
     }
   }
 
-  const user = await rp.get(`${baseUrl}/api/v4/user`, requestOptions)
+  const user = await rp.get(`${baseUrl}/api/${apiversion}/user`, requestOptions)
   if (argv.verbose) {
     console.log(`Got user: ${user.name} (${user.username}) ID: ${user.id}`)
   }
 
-  const personalProjects = await rp.get(
-    `${baseUrl}/api/v4/users/${user.id}/projects`,
-    requestOptions
-  )
-  if (argv.verbose) {
-    console.log(
-      'Got personal projects:\n',
-      personalProjects.map(p => p.name)
-    )
+  var projectsUrl = `${baseUrl}/api/${apiversion}/users/${user.id}/projects`
+  if (apiversion == 'v3') {
+    projectsUrl = `${baseUrl}/api/v3/projects`
   }
+  // const personalProjects = await rp.get(projectsUrl, requestOptions)
+  // if (argv.verbose) {
+  //   console.log(
+  //     'Got personal projects:\n',
+  //     personalProjects.map(p => p.name)
+  //   )
+  // }
 
-  let pgits = _.map(personalProjects, 'http_url_to_repo')
+  // let pgits = _.map(personalProjects, 'http_url_to_repo')
+  // console.log(`1. personal projects len = ${pgits.length}`)
+
+  //存放权限内的所有git仓库
+  let pgits = new Array()
 
   const groups = await rp.get(
-    `${baseUrl}/api/v4/groups?per_page=999`,
+    `${baseUrl}/api/${apiversion}/groups?per_page=999`,
     requestOptions
   )
 
   if (argv.verbose) {
     console.log(
-      'Got groups:\n',
-      groups.map(g => g.name)
+      'Got groups:\n', groups.map(g => g.name)
     )
   }
 
-  const gids = _.map(groups, 'id')
-  for (let gid of gids) {
-    let projects = await rp.get(
-      `${baseUrl}/api/v4/groups/${gid}/projects?per_page=999`,
-      requestOptions
-    )
-    let ps = _.map(projects, method)
+  //const gids = _.map(groups, 'id')
+  for (let grp of groups) {
+    var gid = grp.id
+    var gname = grp.name
+
+    console.log(`====Got projects under group ${gname}(${gid})====`)
+    
+    // if (apiversion == 'v3') {
+      var projects = await rp.get(
+        `${baseUrl}/api/${apiversion}/groups/${gid}`,
+        requestOptions
+      )
+      var ps = projects['projects']
+    // } else {
+    //   var projects = await rp.get(
+    //     `${baseUrl}/api/${apiversion}/groups/${gid}/projects?per_page=999`,
+    //     requestOptions
+    //   )
+    //   var ps = _.map(projects, method)
+    // }
+    
     for (let p of ps) {
-      console.log(`Got project ${p} of ${gid}`)
+      if (argv.verbose) {
+        console.log(`Loop group projects ${p.name}(${p.id}) `)
+      }
+      p.grp = grp
       pgits.push(p)
     }
   }
+
+  console.log(`=======all projects count is ${pgits.length}`)
 
   if (argv.verbose) {
     console.log('Backing up following repos')
@@ -123,23 +156,30 @@ const cliProgress = require('cli-progress');
 
   let index = 0
   for (let repo of pgits) {
-    const repoName = repo.substring(argv.method == 'ssh' ? 15 : 19, repo.length - 4)
-    const repoPath = `${argv.output || 'gitlab-backup'}/${repoName}`
+    
+    // const repoName = repo.substring(argv.method == 'ssh' ? 15 : 19, repo.length - 4)
+    const repoName= repo.grp.name + '/' + repo.name
+    const repoRemotePath = repo[method]
+    const repoLocalPath = `${argv.output || 'gitlab-backup'}/${repoName}`
+  
+    console.log(`======== repoName = ${repoName} `)
+    console.log(`======== repoRemotePath = ${repoRemotePath}`)
+    console.log(`======== repoLocalPath = ${repoLocalPath}`)
 
-    if (fs.existsSync(repoPath)) {
-      const stats = fs.statSync(repoPath)
+    if (fs.existsSync(repoLocalPath)) {
+      const stats = fs.statSync(repoLocalPath)
 
       if (!stats.isDirectory) {
-        console.error(`Path ${repoPath} exist and not a directory. Skipped.`)
+        console.error(`Path ${repoLocalPath} exist and not a directory. Skipped.`)
       } else {
         console.log(`Pulling ${repoName}`)
-        const stdout = await cmdAsync(`git -C ${repoPath} pull`).catch(
+        const stdout = await cmdAsync(`git -C ${repoLocalPath} pull`).catch(
           console.log
         )
       }
     } else {
       console.log(`Cloning ${repoName}`)
-      const stdout = await cmdAsync(`git clone ${repo} ${repoPath}`).catch(
+      const stdout = await cmdAsync(`git clone ${repoRemotePath} ${repoLocalPath}`).catch(
         console.log
       )
     }

@@ -1,27 +1,36 @@
-# GitlabBackupUtil
+# GitlabBatchClone
 
-A Small utility to backup all of your gitlab repositories to local filesystem.
-You never know when international laws change and you loose access to your repos.
+Batch clone, pulling, backup all projects within priviledge in gitlab。
+批量克隆，拉取，或者备份所有权限内的gitlab代码库
 
-<blockquote class="twitter-tweet"><p lang="en" dir="ltr">It is painful for me to hear how trade restrictions have hurt people. We have gone to great lengths to do no more than what is required by the law, but of course people are still affected. GitHub is subject to US trade law, just like any company that does business in the US.</p>&mdash; Nat Friedman (@natfriedman) <a href="https://twitter.com/natfriedman/status/1155311121038864384?ref_src=twsrc%5Etfw">July 28, 2019</a></blockquote>
-
-## How to Backup 
-
-### Backup using http (default)
+## Install 安装
 
 ```javascript
-npm install -g gitlab-backup-util
-gitlab-backup-util -t 'your-gl-token-here'
+npm install -g gitlab-batch-clone --force
 ```
 
-### Backup using ssh
+### Clone
+
 ```javascript
-gitlab-backup-util -t 'your-gl-token-here' -m ssh
+gitlab-batch-clone \
+-u 'http://git.domain.com' -m 'http' \
+-t 'your-private-token' -p 'v3' \
+-o '/Users/Nicholas/gitlab-backup' \
+-verbose
 ```
 
-#### Future Scope
-* - [✔] If the repository already exists, `git pull` instead of cloning
-* - [ ] Gui for entering token
+其中:
+-m method，选择git克隆的方式。有 ssh 和 http 两个选项，建议用http，否则需要配置下密钥对。
+-p apiversion, gitlab 11支持v4的rest api， 老版本的使用v3
+-t private token, 登录进入gitlab，在profile里找到private token / access token.
+-o ouput path, 克隆到的本地路径
 
+### gitlab v3 api地址
+https://gitlab.com/gitlab-org/gitlab-foss/-/blob/8-16-stable/doc/api/README.md
 
-### Thats It :rocket:, Now go backup
+### gitlab v4 api地址
+https://docs.gitlab.com/ee/api/api_resources.html
+
+### 问题修复
+可以直接修改已安装的index.js
+/Users/Nicholas/.nvm/versions/node/v14.7.0/lib/node_modules/gitlab-batch-clone/index.js
